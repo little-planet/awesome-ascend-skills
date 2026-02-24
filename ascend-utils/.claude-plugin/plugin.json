@@ -1,9 +1,0 @@
-{
-  "name": "ascend-utils",
-  "description": "Shared utilities and tools for Ascend NPU skills. Contains common scripts, environment checks, and helper tools used across all Ascend skills.",
-  "version": "1.0.0",
-  "author": {
-    "name": "Ascend AI Coding",
-    "email": "ascend-ai-coding@example.com"
-  }
-}

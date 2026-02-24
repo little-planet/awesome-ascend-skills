@@ -1,9 +1,0 @@
-{
-  "name": "ascend-npu",
-  "description": "Huawei Ascend NPU complete knowledge base entry point. Use as the starting point for all Ascend NPU related tasks including environment setup, CANN installation, testing, AI model development, inference deployment, training, and operator development.",
-  "version": "1.0.0",
-  "author": {
-    "name": "Ascend AI Coding",
-    "email": "ascend-ai-coding@example.com"
-  }
-}

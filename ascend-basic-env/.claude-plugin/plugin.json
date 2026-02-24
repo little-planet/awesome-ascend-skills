@@ -1,9 +1,0 @@
-{
-  "name": "ascend-basic-env",
-  "description": "Huawei Ascend NPU basic environment master skill. Use for environment setup, system preparation, and foundational configuration before development. Routes to specialized sub-skills for CANN installation, NPU commands reference, environment diagnostics, and testing.",
-  "version": "1.0.0",
-  "author": {
-    "name": "Ascend AI Coding",
-    "email": "ascend-ai-coding@example.com"
-  }
-}

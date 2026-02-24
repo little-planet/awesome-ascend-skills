@@ -1,9 +1,0 @@
-{
-  "name": "ascend-use-cases",
-  "description": "Ascend NPU real-world use cases and examples. Use for practical implementation examples and best practices for operators, inference, and training.",
-  "version": "1.0.0",
-  "author": {
-    "name": "Ascend AI Coding",
-    "email": "ascend-ai-coding@example.com"
-  }
-}

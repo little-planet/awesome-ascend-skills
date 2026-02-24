@@ -1,9 +1,0 @@
-{
-  "name": "ascend-dev",
-  "description": "Huawei Ascend NPU development master skill. Use for AI model development, inference deployment, training, and operator development. Routes to framework-specific sub-skills.",
-  "version": "1.0.0",
-  "author": {
-    "name": "Ascend AI Coding",
-    "email": "ascend-ai-coding@example.com"
-  }
-}
