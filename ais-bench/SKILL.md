@@ -340,14 +340,53 @@ ais_bench --models model1 --datasets dataset1 --repeat-n 5
 1. **Model connection failed**: Check `host_ip`, `host_port`, and service status
 2. **Dataset not found**: Download dataset to `ais_bench/datasets/`
 3. **Memory issues**: Reduce `batch_size` or use smaller dataset
+---
+
+## Helper Scripts
+
+Quick utility scripts for common operations:
+
+| Script | Description |
+|--------|-------------|
+| [scripts/check_env.sh](scripts/check_env.sh) | Verify environment setup |
+| [scripts/run_accuracy_test.sh](scripts/run_accuracy_test.sh) | Quick accuracy test runner |
+| [scripts/run_performance_test.sh](scripts/run_performance_test.sh) | Quick performance test runner |
+| [scripts/parse_results.py](scripts/parse_results.py) | Parse and summarize results |
+
+```bash
+# Check environment
+bash scripts/check_env.sh
+
+# Quick accuracy test
+bash scripts/run_accuracy_test.sh vllm_api_general_chat demo_gsm8k --host-port 8080
+
+# Quick performance test
+bash scripts/run_performance_test.sh vllm_api_general_chat sharegpt --concurrency 100
+
+# Parse results
+python scripts/parse_results.py outputs/default/20250628_151326
+```
 
 ---
 
-## Official References
+## References
 
-- **Official Website**: https://www.aisbench.com
-- **Documentation (EN)**: https://ais-bench-benchmark-rf.readthedocs.io/en/latest/
-- **Documentation (CN)**: https://ais-bench-benchmark-rf.readthedocs.io/zh-cn/latest/
-- **GitHub**: https://github.com/AISBench/benchmark
-- **Developer Guide**: https://ais-bench-benchmark-rf.readthedocs.io/en/latest/develop_guide/contributing.html
-- **Report Issues**: https://github.com/AISBench/benchmark/issues/new/choose
+Detailed documentation for specific use cases:
+
+- **[Model Configuration Reference](references/model-configs.md)**: All model types (vLLM, MindIE, Triton, TGI, offline) with parameter explanations
+- **[CLI Reference](references/cli-reference.md)**: Complete CLI options for accuracy and performance evaluation
+
+---
+
+## Templates
+
+Ready-to-use templates for custom evaluation:
+
+| Template | Description |
+|----------|-------------|
+| [assets/model_config_template.py](assets/model_config_template.py) | Model configuration template |
+| [assets/custom_qa_template.jsonl](assets/custom_qa_template.jsonl) | QA dataset template |
+| [assets/custom_mcq_template.csv](assets/custom_mcq_template.csv) | Multiple choice dataset template |
+| [assets/custom_meta_template.json](assets/custom_meta_template.json) | Dataset metadata template |
+
+---
