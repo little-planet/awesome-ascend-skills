@@ -43,6 +43,12 @@
       "description": "AI model evaluation tool for Ascend NPU. Supports accuracy evaluation (text, multimodal datasets), performance evaluation (latency, throughput, stress testing), vLLM/Triton inference, 15+ benchmarks (MMLU, GSM8K, MMMU, BFCL), multi-turn dialogue, Function Call, and custom datasets.",
       "source": "./ais-bench",
       "category": "testing"
+    },
+    {
+      "name": "ascendc",
+      "description": "AscendC development helper, provides AscendC development environment, compiler, and debugger. Supports C/C++ and Python programming on Ascend NPU. Includes sample code, tutorials, and best practices for AscendC development.",
+      "source": "./ascendc",
+      "category": "development"
     }
   ]
 }
