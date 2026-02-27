@@ -542,6 +542,79 @@ If Python tests exist in the project (e.g., `op-plugin/test/test_custom_ops/test
 
 ---
 
+## Operator Project Generation (genop)
+
+### Overview
+
+The `genop` functionality is a tool provided in the `ops-transformer` project that allows users to quickly create the initial directory structure for a new operator. It uses a template-based approach to generate all the necessary files and directories for a new operator project.
+
+### How to Use genop
+
+To create a new operator project, use the following command in the `ops-transformer` directory:
+
+```bash
+bash build.sh --genop=op_class/op_name
+```
+
+Where:
+- `op_class` is the category of the operator (e.g., `gmm`, `moe`, `ffn`)
+- `op_name` is the name of the new operator (e.g., `my_custom_op`)
+
+### Example Usage
+
+```bash
+bash build.sh --genop=gmm/my_custom_gmm_op
+```
+
+This command will create a new directory structure under `gmm/my_custom_gmm_op` with all the necessary files for a new GMM operator.
+
+### What genop Generates
+
+The `genop` tool generates the following structure for a new operator:
+
+1. **Directory Structure**:
+   - `op_host/`: Contains operator definition, tiling, and infershape logic
+   - `op_kernel/`: Contains AscendC kernel implementation
+   - `examples/`: Contains CANN API usage examples
+   - `CMakeLists.txt`: Build configuration for the operator
+
+2. **Key Files**:
+   - `op_host/*_def.cpp`: Operator definition with input/output/attribute declarations
+   - `op_host/*_tiling.cpp`: Tiling and scheduling logic
+   - `op_kernel/*.h`: AscendC kernel implementation
+   - `examples/test_aclnn_*.cpp`: CANN API usage example
+
+### Customization After Generation
+
+After generating the operator project with `genop`, you need to:
+
+1. **Modify the operator definition** in `op_host/*_def.cpp`:
+   - Update input/output parameters and data types
+   - Adjust attributes and their default values
+   - Configure AICore settings if needed
+
+2. **Implement the kernel logic** in `op_kernel/*.h`:
+   - Add the actual computation logic
+   - Handle different data types and quantization modes
+   - Optimize for performance
+
+3. **Update tiling logic** in `op_host/*_tiling.cpp`:
+   - Adjust tiling parameters for optimal performance
+   - Handle different input shapes and configurations
+
+4. **Write or update examples** in `examples/`:
+   - Create test cases for the new operator
+   - Verify functionality with different input shapes
+
+### Benefits of Using genop
+
+- **Saves time**: Automatically creates the entire directory structure and boilerplate code
+- **Ensures consistency**: Follows the same patterns as existing operators
+- **Reduces errors**: Minimizes manual errors when setting up a new operator project
+- **Simplifies onboarding**: Makes it easier for new developers to create operators
+
+---
+
 ## Generic Operator Example Generation
 
 ### Overview
