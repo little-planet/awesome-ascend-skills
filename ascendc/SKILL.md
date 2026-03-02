@@ -1,6 +1,6 @@
 ---
 name: ascendc
-description: Guides development of AscendC transformer ops (FFN/GMM/MoE) and CANN aclnn examples by following existing patterns under ops-transformer. Use when adding or modifying such ops, kernels, tiling/infershape, or aclnn examples.
+description: AscendC transformer/GMM/MoE 算子与 Matmul/Cube Kernel 的统一开发规范。用于在 ops-transformer 下新增或修改 op_host、tiling/infershape、op_kernel（含 MatmulImpl/Cube 调用）、以及对应的 CANN aclnn 示例和单测。
 keywords:
   - ascend
   - ascendc
@@ -9,6 +9,9 @@ keywords:
   - 开发环境
   - 算子
   - 昇腾
+  - matmul
+  - cube
+  - grouped_matmul
 ---
 
 # AscendC Transformer 算子开发
@@ -17,10 +20,11 @@ keywords:
 
 ## When to Use
 
-- 新增或修改 FFN / GMM / MoE 类 AscendC 算子
-- 补充或修改 op_host 定义、tiling/infershape、op_kernel 实现
-- 编写或调整 CANN `aclnn_*` 示例与单测
-- 对齐、重构或修 bug 时保持与现有算子风格一致
+- **算子层面**：在 `ops-transformer` 目录下新增或修改 FFN / GMM / MoE / 路由类 AscendC 算子（含前向、反向、路由融合等）。
+- **Kernel 层面（重点）**：需要在 AscendC `op_kernel` 中实现或调整 Matmul/Cube 调用（如 `MatmulImpl`、分块 GEMM、AIC/AIV 协作、确定性 GMM、`grouped_matmul_finalize_routing` 风格的 kernel）。
+- **Tiling / Infershape 层面**：补充或修改 `*_tiling*.h/.cpp`、`*_infershape.cpp`，或需要理解 shape→tiling→kernel 的完整映射。
+- **示例与单测**：编写或调整 CANN `aclnn_*` 示例与 Python/CPP 单测，要求接口、dtype、格式与 op_host/op_kernel 精确对齐。
+- **对齐与重构**：重构、修 bug 或新增功能时，希望严格沿用现有 FFN/GMM/MoE 模式，而不是从零发明新风格。
 
 ---
 
@@ -41,6 +45,7 @@ keywords:
 |------|------|
 | [references/type_format_reference.md](references/type_format_reference.md) | op_host 类型/格式枚举与 DataType·Format·UnknownShapeFormat 个数约定 |
 | [references/ascendc_kernel_implement.md](references/ascendc_kernel_implement.md) | Kernel 开发：CopyIn/Compute/CopyOut、TQue、GlobalTensor 等 |
+| [references/ascendc_kernel.md](references/ascendc_kernel.md) | Matmul/Cube 调用模板：MatmulType/MatmulImpl、SetOrgShape/SetSingleShape/Iterate/GetTensorC 分块模式 |
 | [references/op_host_examples.md](references/op_host_examples.md) | FFN/GMM/MoE 的 Input/Output/Attr 定义示例代码 |
 | [references/op_kernel_skeletons.md](references/op_kernel_skeletons.md) | FFN/GMM/MoE 的 op_kernel 命名空间与主类骨架 |
 | [references/op_host_json_types_flow.md](references/op_host_json_types_flow.md) | 用 JSON + graph/types.h 驱动 op_host/infershape/tiling 对齐的流程 |
@@ -70,6 +75,16 @@ keywords:
 - **共性**：命名空间与算子一致；包含 `kernel_operator.h`、矩阵类用 `lib/matmul_intf.h`；类型别名与 `MatmulImpl` 等按参考算子；用模板区分 dtype/量化/激活等。
 - **骨架代码**：见 [references/op_kernel_skeletons.md](references/op_kernel_skeletons.md)（FFN/GMM/MoE 的 Param 与 Compute 类骨架）。
 - **要点**：确认是否仍基于 `MatmulImpl` 及 tiling 字段；只增删 GM 输入、调整 ComputeDequantAndActivate 等业务逻辑；保持队列/UB 分配、PipeBarrier、DataCopyPad、SetAtomicAdd 等模式不变。
+
+### Matmul / Cube 编写指引（子 Skill）
+
+- **何时使用**：新增或修改基于 Matmul 的 AscendC 内核（如 GMM、MoE finalize routing 等），需要在 AIC 上用 Cube 做矩阵乘。
+- **步骤**：
+  1. 在参考算子中找到 `MatmulType` 和 `MatmulImpl` 定义（如 `grouped_matmul.h`、`grouped_matmul_finalize_routing.h`），按「A: GM+ND、B: GM+NZ、C: GM+ND」模式复用或稍作调整；必要时参考 [references/ascendc_kernel.md](references/ascendc_kernel.md) 的示例。
+  2. 在 `Init` 中将 Host 传入的 `x/weight/bias/workspace` 等 GM 地址绑定为 `GlobalTensor`，并保存 tiling 中的 `baseM/baseN/baseK`、`stepKa/stepKb`、`coreNum/parallNum` 等字段。
+  3. 在 `Process` 中，先根据 tiling 把整体 M×N×K 按 `baseM/baseN` 划分为若干 block（可直接复用 `MNConfig` + `MNBlockIdxCompute` 模式），为每个 block 计算 A/B/C 的 GM 与 workspace 偏移。
+  4. 对每个 block，按照 [references/ascendc_kernel.md](references/ascendc_kernel.md) 中的模板调用 `mm.SetOrgShape` / `mm.SetSingleShape` / `mm.SetTensorA` / `mm.SetTensorB` / `while (mm.Iterate()) { GetTensorC(...) }`，仅在 AIC 核上执行；若需要在 AIV 上做 dequant / per-token / bias，请参考 `grouped_matmul_finalize_routing` 的 `VectorCompute` 流程。
+  5. 若需要 AIC/AIV 协作与确定性效果，按 `grouped_matmul_finalize_routing` 复用 workspace 分片与 `CrossCoreSetFlag`/`CrossCoreWaitFlag`/`FRDeterministic` 的模式，不自行发明新的同步方案。
 
 ---
 
