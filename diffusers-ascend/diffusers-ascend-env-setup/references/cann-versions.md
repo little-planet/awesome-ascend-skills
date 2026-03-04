@@ -10,6 +10,7 @@
 
 ```bash
 echo "ASCEND_HOME_PATH: $ASCEND_HOME_PATH"
+echo "ASCEND_TOOLKIT_HOME: $ASCEND_TOOLKIT_HOME"
 echo "ASCEND_OPP_PATH: $ASCEND_OPP_PATH"
 echo "ASCEND_AICPU_PATH: $ASCEND_AICPU_PATH"
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
@@ -34,24 +35,28 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 ### 情况 2：CANN 安装在自定义路径
 
-如果 CANN 安装在其他位置，请手动配置：
+如果 CANN 安装在其他位置，直接 source 对应的 `set_env.sh`：
 
 ```bash
-# 设置 CANN 根目录（替换为实际路径）
-export ASCEND_HOME_PATH=/your/custom/path/to/cann
-
-# 加载环境
-source ${ASCEND_HOME_PATH}/set_env.sh
+# 替换为实际的 set_env.sh 路径
+source /your/custom/path/to/cann/set_env.sh
 ```
 
 ### 永久配置
 
-添加到 `~/.bashrc`：
+将 CANN 的 `set_env.sh` 添加到 `~/.bashrc`：
 
 ```bash
-# 编辑 ~/.bashrc，添加以下内容
-export ASCEND_HOME_PATH=/usr/local/Ascend/cann  # 或您的自定义路径
-source ${ASCEND_HOME_PATH}/set_env.sh
+# 编辑 ~/.bashrc，添加以下内容（选择对应路径）
+
+# CANN 8.5+
+source /usr/local/Ascend/cann/set_env.sh
+
+# 或 CANN 8.5 之前
+# source /usr/local/Ascend/ascend-toolkit/set_env.sh
+
+# 或自定义路径
+# source /your/custom/path/to/cann/set_env.sh
 ```
 
 然后执行：
@@ -65,6 +70,7 @@ source ~/.bashrc
 | 环境变量 | 说明 |
 |----------|------|
 | `ASCEND_HOME_PATH` | CANN 安装根目录 |
+| `ASCEND_TOOLKIT_HOME` | CANN 工具包目录 |
 | `ASCEND_OPP_PATH` | 算子库路径 |
 | `ASCEND_AICPU_PATH` | AI CPU 运行时路径 |
 | `LD_LIBRARY_PATH` | 动态库搜索路径 |

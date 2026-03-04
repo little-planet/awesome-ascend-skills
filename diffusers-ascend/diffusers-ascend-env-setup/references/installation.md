@@ -28,6 +28,7 @@ fi
 
 ```bash
 echo $ASCEND_HOME_PATH
+echo $ASCEND_TOOLKIT_HOME
 echo $ASCEND_OPP_PATH
 echo $ASCEND_AICPU_PATH
 ```
@@ -40,7 +41,7 @@ echo $ASCEND_AICPU_PATH
 import os
 
 # 检查关键环境变量
-required_vars = ["ASCEND_HOME_PATH", "ASCEND_OPP_PATH"]
+required_vars = ["ASCEND_HOME_PATH", "ASCEND_TOOLKIT_HOME", "ASCEND_OPP_PATH"]
 for var in required_vars:
     value = os.environ.get(var)
     if value:
