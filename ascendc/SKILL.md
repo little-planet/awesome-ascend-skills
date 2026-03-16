@@ -55,10 +55,13 @@ keywords:
 | [references/06-tiling.md](references/06-tiling.md) | Tiling 实现：标准 C++ 与宏定义两种方式及取值/写回差异 | 实现或修改 tiling 时 |
 | [references/07-aclnn-template.md](references/07-aclnn-template.md) | aclnn 示例通用模板与生成步骤 | 写 test_aclnn_* 时 |
 | [references/08-genop.md](references/08-genop.md) | genop 命令、生成结构、生成后定制与常见问题 | 从零生成新算子目录时 |
+| [references/09-tensor-and-tque.md](references/09-tensor-and-tque.md) | GlobalTensor / LocalTensor / TQue 使用要点与确定性同步队列配置 | 需要梳理 GM↔UB 搬运或 Sync workspace 队列大小时 |
+| [references/sync.md](references/sync.md) | 核间同步：SyncAll（全核栅栏/软·硬同步）、InitDetermineComputeWorkspace/WaitPreBlock/NotifyNextBlock（保序写）用法与示例 | 多核全核同步、多核保序写 GM、按 GID/核顺序累加时 |
 
 **官方文档为参考示例**：本 skill 以 CANN 官方文档为规范与示例来源，不依赖本地工程路径。
 
 - **Ascend C API**：[Ascend C API 列表](https://www.hiascend.com/document/detail/zh/canncommercial/850/API/ascendcopapi/atlasascendc_api_07_0003.html)（LocalTensor、GlobalTensor、TQue、Matmul 等）
+- **核间同步**：[SyncAll](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/ascendcopapi/atlasascendc_api_07_0204.html)（全核栅栏，软/硬同步）、[InitDetermineComputeWorkspace](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/ascendcopapi/atlasascendc_api_07_0206.html)/[WaitPreBlock](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/ascendcopapi/atlasascendc_api_07_0207.html)/[NotifyNextBlock](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/API/ascendcopapi/atlasascendc_api_07_0208.html)（保序写）；用法、约束与示例见 [references/sync.md](references/sync.md)。
 - **Tiling**：[Host侧Tiling实现 - 基本流程](https://www.hiascend.com/document/detail/zh/canncommercial/850/opdevg/Ascendcopdevg/atlas_ascendc_10_00021.html)、[使用标准C++语法定义Tiling结构体](https://www.hiascend.com/document/detail/zh/canncommercial/850/opdevg/Ascendcopdevg/atlas_ascendc_10_00024.html)
 - **样例代码**：[Gitee ascend/samples - operator/ascendc](https://gitee.com/ascend/samples/tree/master/operator/ascendc)
 
@@ -101,7 +104,7 @@ keywords:
 ### Matmul / Cube 子流程
 
 - **何时**：新增或修改基于 Matmul 的内核（如 GMM、MoE finalize routing）。
-- **步骤概要**：（1）按 [02-kernel-guide](references/02-kernel-guide.md) 与官方 Matmul 高阶 API 定义 `MatmulType`/`MatmulImpl`，按 A:GM+ND、B:GM+NZ、C:GM+ND 复用或微调；（2）Init 中把 Host 传入的 GM 绑定为 `GlobalTensor`，保存 tiling 的 baseM/baseN/baseK、stepKa/stepKb、coreNum/parallNum 等；（3）Process 中按 tiling 划分 M×N×K block，算 A/B/C 的 GM 与 workspace 偏移；（4）每 block 按 [02-kernel-guide](references/02-kernel-guide.md) 调用 `SetOrgShape`/`SetSingleShape`/`SetTensorA`/`SetTensorB`/`Iterate`+`GetTensorC`，仅 AIC 执行；需 AIV 协作或确定性时参考官方多核/同步文档与 Gitee 样例，不自行发明同步方案。详见 [02-kernel-guide](references/02-kernel-guide.md)。
+- **步骤概要**：（1）按 [02-kernel-guide](references/02-kernel-guide.md) 与官方 Matmul 高阶 API 定义 `MatmulType`/`MatmulImpl`，按 A:GM+ND、B:GM+NZ、C:GM+ND 复用或微调；（2）Init 中把 Host 传入的 GM 绑定为 `GlobalTensor`，保存 tiling 的 baseM/baseN/baseK、stepKa/stepKb、coreNum/parallNum 等；（3）Process 中按 tiling 划分 M×N×K block，算 A/B/C 的 GM 与 workspace 偏移；（4）每 block 按 [02-kernel-guide](references/02-kernel-guide.md) 调用 `SetOrgShape`/`SetSingleShape`/`SetTensorA`/`SetTensorB`/`Iterate`+`GetTensorC`，仅 AIC 执行；需 AIV 协作或**多核保序写 GM（按 GID/核顺序累加）**时，使用确定性 workspace：见 [references/sync.md](references/sync.md)（InitDetermineComputeWorkspace、WaitPreBlock、NotifyNextBlock 的用法、空间约束与产品支持）；分离模式下仅 AIV 生效且 Wait/Notify 之间仅矢量计算。详见 [02-kernel-guide](references/02-kernel-guide.md)。
 
 ---
 
