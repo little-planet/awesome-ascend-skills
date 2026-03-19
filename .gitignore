@@ -39,3 +39,6 @@ venv/
 
 # Agent
 .sisyphus
+CLAUDE.md
+_*
+.local/*
