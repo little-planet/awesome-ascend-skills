@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 
-def parse_frontmatter(content: str) -> Tuple[Dict[str, str], str]:
+def parse_frontmatter(content: str) -> tuple[dict, str]:
     if not content.startswith("---"):
         return {}, content
 
@@ -26,7 +24,7 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, str], str]:
     return frontmatter, body
 
 
-def validate_skill_file(skill_path: Path) -> Tuple[List[str], List[str]]:
+def validate_skill_file(skill_path: Path, repo_root: Path) -> tuple[list, list]:
     errors = []
     warnings = []
 
@@ -34,14 +32,14 @@ def validate_skill_file(skill_path: Path) -> Tuple[List[str], List[str]]:
     frontmatter, body = parse_frontmatter(content)
 
     if "name" not in frontmatter:
-        errors.append(f"Missing 'name' field in frontmatter")
+        errors.append("Missing 'name' field in frontmatter")
     elif not frontmatter["name"]:
-        errors.append(f"Empty 'name' field in frontmatter")
+        errors.append("Empty 'name' field in frontmatter")
 
     if "description" not in frontmatter:
-        errors.append(f"Missing 'description' field in frontmatter")
+        errors.append("Missing 'description' field in frontmatter")
     elif not frontmatter["description"]:
-        errors.append(f"Empty 'description' field in frontmatter")
+        errors.append("Empty 'description' field in frontmatter")
     elif len(frontmatter["description"]) < 20:
         warnings.append(
             f"Description is too short ({len(frontmatter['description'])} chars) - may affect agent matching"
@@ -50,15 +48,19 @@ def validate_skill_file(skill_path: Path) -> Tuple[List[str], List[str]]:
     expected_name = skill_path.parent.name
     actual_name = frontmatter.get("name", "")
 
-    path_parts = skill_path.parts
-    is_npu_commands_subskill = (
-        "npu-commands" in path_parts and skill_path.parent.name not in ["npu-commands"]
-    )
+    rel_path = skill_path.relative_to(repo_root)
+    rel_parts = rel_path.parts
 
-    if is_npu_commands_subskill:
-        if not actual_name.startswith("npu-smi-"):
-            warnings.append(
-                f"Skill name '{actual_name}' should start with 'npu-smi-' for consistency"
+    is_in_agents = ".agents" in rel_parts
+    depth = len(rel_parts) - 1  # -1 for SKILL.md itself
+
+    is_nested_skill = depth > 1 and not is_in_agents
+
+    if is_nested_skill:
+        folder_name = rel_parts[0]
+        if not actual_name.startswith(f"{folder_name}-"):
+            errors.append(
+                f"Nested skill name '{actual_name}' should start with '{folder_name}-' (format: folder-skillname)"
             )
     else:
         if actual_name != expected_name:
@@ -67,7 +69,7 @@ def validate_skill_file(skill_path: Path) -> Tuple[List[str], List[str]]:
             )
 
     if "[TODO:" in body or "[TODO]" in body:
-        warnings.append(f"Contains TODO placeholder - should be completed before merge")
+        warnings.append("Contains TODO placeholder - should be completed before merge")
 
     if len(body.strip()) < 100:
         warnings.append(f"Body content is very short ({len(body.strip())} chars)")
@@ -91,7 +93,7 @@ def main():
 
     for skill_path in sorted(skill_files):
         rel_path = skill_path.relative_to(repo_root)
-        errors, warnings = validate_skill_file(skill_path)
+        errors, warnings = validate_skill_file(skill_path, repo_root)
 
         if errors or warnings:
             print(f"\n📄 {rel_path}")
