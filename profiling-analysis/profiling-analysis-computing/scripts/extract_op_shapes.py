@@ -4,8 +4,19 @@ import argparse
 import csv
 import json
 import sys
+import re
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile, is_zipfile
+
+# 定义支持形状解析的算子类型及其对应的解析参数
+supported_ops = {
+    'matmul': {
+        'keywords': ['matmul'],
+        'column_mapping': {'m': 'M', 'k': 'K', 'n': 'N'},
+        'format_template': "M={M}, K={K}, N={N}"
+    },
+    # 后续可以在这里添加更多支持的算子类型
+}
 
 
 HEADER_INPUT_SHAPES = "inputshapes"
@@ -388,6 +399,84 @@ def write_output(path, rows):
     raise ValueError("output path must end with .json, .csv, .xlsx, or .xlsm")
 
 
+def replace_html_shapes(html_file, shape_mapping, target_operators):
+    """
+    在HTML文件中替换Input Shapes为解析后的形状
+    
+    参数：
+        html_file: HTML文件路径
+        shape_mapping: 形状映射字典 {原始形状: 解析后的形状}
+        target_operators: 目标算子列表
+        
+    返回：
+        bool: 是否成功替换
+    """
+    try:
+        with open(html_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        
+        modified_html = html_content
+        
+        for target_op in target_operators:
+            print(f"  为{target_op}算子替换形状...")
+            
+            # 找到当前算子的标题位置
+            title_pos = modified_html.find(f'<h2>算子: {target_op}</h2>')
+            if title_pos == -1:
+                continue
+            
+            # 找到当前表格的开始位置
+            table_start = modified_html.find('<table', title_pos)
+            if table_start == -1:
+                continue
+            
+            # 找到当前表格的结束位置
+            table_end = modified_html.find('</table>', table_start) + len('</table>')
+            if table_end == len('</table>') - 1:
+                continue
+            
+            # 提取当前表格内容
+            table_content = modified_html[table_start:table_end]
+            
+            # 在表格内部进行形状替换
+            updated_table = table_content
+            for original_shape, parsed_shape in shape_mapping.items():
+                # 处理带引号和不带引号的两种情况
+                updated_table = updated_table.replace(f"<td>{original_shape}</td>", f"<td>{parsed_shape}</td>")
+                updated_table = updated_table.replace(f"<td>\"{original_shape}\"</td>", f"<td>{parsed_shape}</td>")
+            
+            # 将更新后的表格替换回原HTML
+            modified_html = modified_html[:table_start] + updated_table + modified_html[table_end:]
+        
+        # 保存修改后的HTML文件
+        with open(html_file, "w", encoding="utf-8") as f:
+            f.write(modified_html)
+        
+        return True
+    except Exception as e:
+        print(f"替换HTML形状时出错: {e}")
+        return False
+
+
+def detect_supported_ops(top_ops):
+    """
+    检测高耗时算子中是否有支持形状解析的算子类型
+    
+    参数：
+        top_ops: 高耗时算子列表
+        
+    返回：
+        list: 检测到的支持的算子类型列表
+    """
+    detected_ops = []
+    for op_type, config in supported_ops.items():
+        for op in top_ops:
+            if any(keyword in op.lower() for keyword in config['keywords']):
+                detected_ops.append(op_type)
+                break
+    return detected_ops
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description=(
@@ -419,6 +508,10 @@ def build_parser():
         help="Operator to extract (default: matmul)",
         default="matmul",
     )
+    parser.add_argument(
+        "--html-file",
+        help="Optional HTML file path to replace Input Shapes with parsed shapes",
+    )
     return parser
 
 
@@ -429,11 +522,69 @@ def main():
 
     try:
         rows = extract_rows(input_path, patterns, target_op=args.op)
+        
+        # 输出形状解析结果
         if args.output:
             output_path = Path(args.output).expanduser().resolve()
             write_output(output_path, rows)
+            print(f"{args.op}形状解析成功，结果保存到: {output_path}")
         else:
             print(json.dumps(rows, indent=2, ensure_ascii=False))
+        
+        # 如果提供了HTML文件，则进行形状替换
+        if args.html_file:
+            print(f"\n开始替换HTML文件中的形状: {args.html_file}")
+            
+            # 使用当前解析的算子类型
+            op_type = args.op
+            
+            if op_type in supported_ops:
+                print(f"处理{op_type}算子形状替换...")
+                
+                # 从输出文件中读取形状解析结果
+                if args.output and Path(args.output).exists():
+                    import pandas as pd
+                    shapes_df = pd.read_csv(args.output)
+                    
+                    # 过滤掉解析失败的记录
+                    config = supported_ops[op_type]
+                    valid_shapes = shapes_df
+                    for col in config['column_mapping'].keys():
+                        valid_shapes = valid_shapes[valid_shapes[col].notnull()]
+                    
+                    if not valid_shapes.empty:
+                        # 构建形状映射字典: {原始形状: 格式化的解析结果}
+                        shape_mapping = {}
+                        for _, row in valid_shapes.iterrows():
+                            input_shape = row['input_shapes']
+                            if input_shape:
+                                # 准备格式化参数
+                                format_params = {}
+                                for col, display_name in config['column_mapping'].items():
+                                    format_params[display_name] = int(row[col]) if not pd.isna(row[col]) else 'N/A'
+                                format_params['rule'] = row['rule']
+                                
+                                # 格式化解析结果
+                                parsed_shape = config['format_template'].format(**format_params)
+                                shape_mapping[input_shape] = parsed_shape
+                        
+                        print(f"成功解析了{len(shape_mapping)}种不同的{op_type}形状")
+                        
+                        # 对于MatMul算子，需要处理MatMul、MatMulV2、MatMulV3
+                        target_operators = ['MatMul', 'MatMulV2', 'MatMulV3'] if op_type == 'matmul' else [op_type]
+                        
+                        # 替换HTML文件中的形状
+                        if replace_html_shapes(args.html_file, shape_mapping, target_operators):
+                            print(f"已成功将{op_type}形状解析结果替换到HTML文件中")
+                        else:
+                            print(f"替换{op_type}形状到HTML文件失败")
+                    else:
+                        print(f"没有成功解析的{op_type}形状")
+                else:
+                    print(f"形状解析结果文件不存在，无法进行替换")
+            else:
+                print(f"不支持的算子类型: {op_type}")
+        
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1

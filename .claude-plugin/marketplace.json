@@ -140,10 +140,10 @@
       "source": "./",
       "strict": false,
       "skills": [
-        "./profiling-analysis/profiling-main",
-        "./profiling-analysis/profiling-hostbound",
-        "./profiling-analysis/profiling-computing",
-        "./profiling-analysis/profiling-communication"
+        "./profiling-analysis",
+        "./profiling-analysis/profiling-analysis-hostbound",
+        "./profiling-analysis/profiling-analysis-computing",
+        "./profiling-analysis/profiling-analysis-communication"
       ]
     },
     {

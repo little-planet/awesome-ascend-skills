@@ -1,5 +1,5 @@
 ---
-name: profiling-analysis-profiling-hostbound-slow-cards
+name: profiling-analysis-hostbound-slow-cards
 ---
 
 # 快慢卡性能分析

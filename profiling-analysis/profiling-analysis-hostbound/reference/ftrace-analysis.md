@@ -1,5 +1,5 @@
 ---
-name: profiling-analysis-profiling-hostbound-ftrace
+name: profiling-analysis-hostbound-ftrace
 ---
 
 # Host侧Trace分析

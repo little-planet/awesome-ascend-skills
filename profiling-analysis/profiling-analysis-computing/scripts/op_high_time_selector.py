@@ -40,19 +40,19 @@ def select_high_time_ops(profiling_path, top_n=3):
         op_stats: 算子统计信息
     """
     # 查找op_statistic_*.csv文件
-    statistic_search_pattern = os.path.join(profiling_path, "PROF_*", "mindstudio_profiler_output", "op_statistic_*.csv")
+    statistic_search_pattern = os.path.join(profiling_path, "**", "op_statistic_*.csv")
     print(f"搜索op_statistic_*.csv模式: {statistic_search_pattern}")
-    op_statistic_files = glob.glob(statistic_search_pattern)
+    op_statistic_files = glob.glob(statistic_search_pattern, recursive=True)
     
     # 查找op_summary_*.csv文件
-    summary_search_pattern = os.path.join(profiling_path, "PROF_*", "mindstudio_profiler_output", "op_summary_*.csv")
+    summary_search_pattern = os.path.join(profiling_path, "**", "op_summary_*.csv")
     print(f"搜索op_summary_*.csv模式: {summary_search_pattern}")
-    op_summary_files = glob.glob(summary_search_pattern)
+    op_summary_files = glob.glob(summary_search_pattern, recursive=True)
     
     # 查找kernel_details.csv文件
-    kernel_search_pattern = os.path.join(profiling_path, "PROF_*", "mindstudio_profiler_output", "kernel_details.csv")
+    kernel_search_pattern = os.path.join(profiling_path, "**", "kernel_details.csv")
     print(f"搜索kernel_details.csv模式: {kernel_search_pattern}")
-    kernel_details_files = glob.glob(kernel_search_pattern)
+    kernel_details_files = glob.glob(kernel_search_pattern, recursive=True)
     
     # 确定使用哪种文件类型
     if op_statistic_files:
@@ -134,15 +134,16 @@ def select_high_time_ops(profiling_path, top_n=3):
         print(f"总数据行数: {len(df)}")
         
         # 确保必要的列存在
-        if "OP Type" not in df.columns or "Task Duration(us)" not in df.columns:
-            print("kernel_details.csv文件缺少必要的列: OP Type 或 Task Duration(us)")
+        op_type_column = "OP Type" if "OP Type" in df.columns else "Type"
+        if op_type_column not in df.columns or "Task Duration(us)" not in df.columns:
+            print(f"kernel_details.csv文件缺少必要的列: {op_type_column} 或 Task Duration(us)")
             return None, None
         
         print("所有必要列都存在")
         
         # 统计各个算子的总耗时
         print(f"统计各个算子的总耗时，选取前{top_n}个...")
-        op_total_duration = df.groupby("OP Type")["Task Duration(us)"].sum().sort_values(ascending=False)
+        op_total_duration = df.groupby(op_type_column)["Task Duration(us)"].sum().sort_values(ascending=False)
         
         # 选取总耗时最高的前N个算子
         top_ops = op_total_duration.head(top_n).index.tolist()

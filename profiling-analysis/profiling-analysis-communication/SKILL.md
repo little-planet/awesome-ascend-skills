@@ -1,5 +1,5 @@
 ---
-name: profiling-analysis-profiling-communication
+name: profiling-analysis-communication
 description: Skill for analyzing communication performance bottlenecks, focusing on data transfer efficiency between host and device in Ascend NPU systems.
 ---
 
@@ -23,7 +23,7 @@ description: Skill for analyzing communication performance bottlenecks, focusing
 
 ## 使用方式
 
-该Skill通常由主分析Skill `/profiling-analysis-profiling-main` 自动调用，也可以单独使用：
+该Skill通常由主分析Skill `/profiling-analysis` 自动调用，也可以单独使用：
 
 ```python
 # 运行通信瓶颈分析

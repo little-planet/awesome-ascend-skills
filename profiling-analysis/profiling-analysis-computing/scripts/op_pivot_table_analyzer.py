@@ -21,11 +21,31 @@
 
 import pandas as pd
 import os
-import glob
 import sys
+import glob
 import argparse
 import json
+import re
 
+def read_csv_in_chunks(file_path, chunksize=2000):
+    """
+    分批读取CSV文件
+    
+    参数：
+        file_path: CSV文件路径
+        chunksize: 每批读取的行数，默认为2000
+    
+    返回：
+        pd.DataFrame: 合并后的DataFrame
+    """
+    chunks = []
+    print(f"分批读取文件: {file_path}, 每批{chunksize}行")
+    
+    for chunk in pd.read_csv(file_path, chunksize=chunksize):
+        chunks.append(chunk)
+        print(f"  已读取{len(chunk)}行，累计{len(pd.concat(chunks, ignore_index=True))}行")
+    
+    return pd.concat(chunks, ignore_index=True)
 def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
     """
     生成算子数据透视表
@@ -44,8 +64,8 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
         print(f"op_total_duration.csv文件不存在: {total_duration_file}")
         return False
     
-    # 读取总览文件
-    op_stats_df = pd.read_csv(total_duration_file)
+    # 读取总览文件，使用分批读取函数
+    op_stats_df = read_csv_in_chunks(total_duration_file, chunksize=2000)
     
     # 确保必要的列存在
     if "OP Type" not in op_stats_df.columns:
@@ -62,14 +82,14 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
     print(f"从op_total_duration.csv中读取到{len(top_ops)}个高耗时算子: {top_ops}")
     
     # 查找op_summary_*.csv文件
-    summary_search_pattern = os.path.join(profiling_path, "PROF_*", "mindstudio_profiler_output", "op_summary_*.csv")
+    summary_search_pattern = os.path.join(profiling_path, "**", "op_summary_*.csv")
     print(f"搜索op_summary_*.csv模式: {summary_search_pattern}")
-    op_summary_files = glob.glob(summary_search_pattern)
+    op_summary_files = glob.glob(summary_search_pattern, recursive=True)
     
     # 查找kernel_details.csv文件
-    kernel_search_pattern = os.path.join(profiling_path, "PROF_*", "mindstudio_profiler_output", "kernel_details.csv")
+    kernel_search_pattern = os.path.join(profiling_path, "**", "kernel_details.csv")
     print(f"搜索kernel_details.csv模式: {kernel_search_pattern}")
-    kernel_details_files = glob.glob(kernel_search_pattern)
+    kernel_details_files = glob.glob(kernel_search_pattern, recursive=True)
     
     # 确定使用哪种文件类型
     if op_summary_files:
@@ -78,7 +98,8 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
         dfs = []
         for file in op_summary_files:
             print(f"读取文件: {file}")
-            df = pd.read_csv(file)
+            # 分批读取文件，无论大小，保证内存效率
+            df = read_csv_in_chunks(file, chunksize=2000)
             dfs.append(df)
         df = pd.concat(dfs, ignore_index=True)
     elif kernel_details_files:
@@ -88,7 +109,8 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
         dfs = []
         for file in kernel_details_files:
             print(f"读取文件: {file}")
-            df = pd.read_csv(file)
+            # 分批读取文件，无论大小，保证内存效率
+            df = read_csv_in_chunks(file, chunksize=2000)
             dfs.append(df)
         df = pd.concat(dfs, ignore_index=True)
     else:
@@ -97,15 +119,38 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
     
     print(f"总数据行数: {len(df)}")
     
-    # 确保必要的列存在
-    required_columns = ["OP Type", "Task Duration(us)", "Input Shapes", 
+    # 确保必要的列存在，支持不同的列名格式
+    column_mapping = {
+        "Name": ["Name", "Op Name"],
+        "Duration(us)": ["Duration(us)", "Task Duration(us)"]
+    }
+    
+    # 检查所有必需的列
+    required_columns = ["Name", "Duration(us)", "Input Shapes", 
                        "aic_mac_ratio", "aic_scalar_ratio", "aic_mte1_ratio", "aic_mte2_ratio", "aic_fixpipe_ratio",
                        "aiv_vec_ratio", "aiv_scalar_ratio", "aiv_mte2_ratio", "aiv_mte3_ratio"]
     
-    for col in required_columns:
-        if col not in df.columns:
-            print(f"缺少必要的列: {col}")
+    actual_columns = df.columns.tolist()
+    column_aliases = {}
+    
+    for req_col in required_columns:
+        found = False
+        if req_col in actual_columns:
+            column_aliases[req_col] = req_col
+            found = True
+        elif req_col in column_mapping:
+            for alias in column_mapping[req_col]:
+                if alias in actual_columns:
+                    column_aliases[req_col] = alias
+                    found = True
+                    break
+        
+        if not found:
+            print(f"缺少必要的列: {req_col}")
             return False
+    
+    # 重命名列以统一格式
+    df = df.rename(columns={v: k for k, v in column_aliases.items() if k != v})
     
     print("所有必要列都存在")
     
@@ -118,10 +163,12 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
     # 为每个算子生成透视表
     for op in top_ops:
         print(f"处理算子: {op}")
-        op_df = df[df["OP Type"] == op]
+        # 使用模糊匹配，查找名称中包含算子关键字的所有记录
+        op_df = df[df["Name"].str.contains(op, case=False)]
         
-        # 按Input Shapes分组，计算各列的平均值
+        # 按Input Shapes分组，计算各列的平均值，包括Duration(us)
         pivot_df = op_df.groupby("Input Shapes").agg({
+            "Duration(us)": "mean",
             "aic_mac_ratio": "mean",
             "aic_scalar_ratio": "mean",
             "aic_mte1_ratio": "mean",
@@ -132,6 +179,9 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
             "aiv_mte2_ratio": "mean",
             "aiv_mte3_ratio": "mean"
         }).reset_index()
+        
+        # 按平均耗时从高到低排序
+        pivot_df = pivot_df.sort_values(by="Duration(us)", ascending=False)
         
         print(f"  该算子有{len(pivot_df)}种不同的Input Shapes")
         
@@ -149,18 +199,39 @@ def generate_op_pivot_tables(profiling_path, output_dir, top_n=3):
         for _, row in pivot_df.iterrows():
             combined_html_output += "<tr>"
             combined_html_output += f"<td>{row['Input Shapes']}</td>"
-            # 找到当前行的最大值
-            max_val = row[1:].max()
-            max_col = row[1:].idxmax()
+            
+            # 过滤掉NaN值，只保留有意义的数据
+            valid_row = row[1:].dropna()
             
             # 保存分析详情
             detail_row = {"OP Type": op, "Input Shapes": row['Input Shapes']}
-            for col in pivot_df.columns[1:]:
-                detail_row[col] = row[col]
-                if row[col] == max_val:
-                    combined_html_output += f"<td style='color: red; font-weight: bold;'>{row[col]:.4f}</td>"
+            
+            if valid_row.empty:
+                # 如果没有有效数据，所有列都显示N/A
+                for col in pivot_df.columns[1:]:
+                    detail_row[col] = None
+                    combined_html_output += f"<td>N/A</td>"
+            else:
+                # 找到各行占比最大的ratio
+                ratio_cols = [col for col in valid_row.index if col != 'Duration(us)']
+                if ratio_cols:
+                    ratio_row = valid_row[ratio_cols]
+                    max_val = ratio_row.max()
+                    max_col = ratio_row.idxmax()
                 else:
-                    combined_html_output += f"<td>{row[col]:.4f}</td>"
+                    max_val = None
+                    max_col = None
+                
+                for col in pivot_df.columns[1:]:
+                    value = row[col]
+                    detail_row[col] = value
+                    if col in ratio_cols and value == max_val:
+                        combined_html_output += f"<td style='color: red; font-weight: bold;'>{value:.4f}</td>"
+                    elif pd.isna(value):
+                        combined_html_output += f"<td>N/A</td>"
+                    else:
+                        combined_html_output += f"<td>{value:.4f}</td>"
+            
             analysis_details.append(detail_row)
             combined_html_output += "</tr>"
         combined_html_output += "</table><br><br>"

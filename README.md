@@ -102,7 +102,7 @@ cp -r awesome-ascend-skills/npu-smi your-project/.agents/skills/
 | [training-mfu-calculator](training-mfu-calculator/SKILL.md) | 测试 | MFU 计算工具：Dense/MoE 模型 FLOPs 计算、Ascend NPU 硬件峰值参考、性能分析报告 |
 | [github-issue-summary](github-issue-summary/SKILL.md) | 开发 | GitHub Issue 分析：从已关闭 issue 生成故障排查案例、根因分析、经验总结 |
 | [github-issue-rca](github-issue-rca/SKILL.md) | 开发 | GitHub Issue 根因分析：分析 issue 内容和代码仓库，识别可能的根本原因，提供调查方向和概率评估 |
-| [profiling-analysis](profiling-analysis/profiling-main/SKILL.md) | 分析 | Profiling 性能分析技能集：分析 step_trace_time.csv 识别下发、通信、计算瓶颈 |
+| [profiling-analysis](profiling-analysis/SKILL.md) | 分析 | 性能优化/性能分析技能集：通过profiling识别下发、通信、计算瓶颈，提供详细的性能分析报告和优化建议 |
 | [mindspeed-llm-train-profiler](mindspeed-llm-train-profiler/SKILL.md) | 分析 | 自动化完成昇腾 NPU 上 MindSpeed-LLM 训练的 Profiling 数据采集 |
 | [ai-for-science](ai-for-science/ai4s-main/SKILL.md) | 开发 | AI for Science 总入口：负责 Profiling 采集、模型迁移、TensorFlow/Keras 路线选择，并分流到对应子 skill。 |
 
